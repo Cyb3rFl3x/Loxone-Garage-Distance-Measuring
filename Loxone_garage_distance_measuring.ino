@@ -9,13 +9,13 @@
 
 // WIFI SETTINGS
 #define WIFI_SSID           "wifi-ssid"
-#define WIFI_PW             "wifi-password"
+#define WIFI_PW             "wifi-pw"
 
 // LOXONE SETTINGS
-#define LOXONE_IP           "url or ip from your loxone"
-#define LOXONE_USER         "loxone user"
-#define LOXONE_PW           "loxone pw"
-#define LOXONE_DEVICENAME   "device name for loxone"
+#define LOXONE_IP           "http://loxone.home"         // IP or http(s)://stuff.stuff
+#define LOXONE_USER         "user"
+#define LOXONE_PW           "password"
+#define LOXONE_DEVICENAME   "devicename"
 
 // SENSOR SETTINGS
 #define DISTANCE_IF_CLOSED  100                           // Distance
@@ -26,9 +26,9 @@
 #define FREQUENCY           100                           // In milliseconds  ( 1000 ms == 1 s )
 #define DEBUG               true 
 
-
 HTTPClient http;
 int httpCode = 0;
+bool lock = false;
 
 /*
  * Function: connect_to_wifi
@@ -128,13 +128,25 @@ int measure_distance() {
  *   status: The string which has to be send to loxone.
  *   returns: NULL
  */
-void send_to_loxone(String status) {
+void send_to_loxone(bool status_value) {
     String url = LOXONE_IP;
 
     url.concat("/dev/sps/io/");
     url.concat(LOXONE_DEVICENAME);
     url.concat("/");
-    url.concat(status);
+    if(status_value == true){
+      url.concat("1");
+        if(DEBUG) {
+          Serial.println(F("Switched to status open"));
+        }
+    } else if(status_value == false){
+      url.concat("0");
+      if(DEBUG) {
+        Serial.println(F("Switched to status closed"));
+      }
+    }
+
+    Serial.println(url);
 
     http.begin(url);
     http.setAuthorization(LOXONE_USER, LOXONE_PW);
@@ -143,7 +155,7 @@ void send_to_loxone(String status) {
 
     if (httpCode == HTTP_CODE_OK) {
         if(DEBUG) {
-            Serial.print("Garage status sent to Loxone. ");
+            Serial.println("Garage status sent to Loxone. ");
         }
     }
     
@@ -161,7 +173,7 @@ void loop() {
 
     int distance = measure_distance();
     bool is_open = check_status(distance);
-
+    
     if(DEBUG) {
         delay(500);
         if(is_open == true) {
@@ -172,22 +184,13 @@ void loop() {
         Serial.print(F(" with size of: "));
         Serial.println(distance);
     }
-
-    bool lock = false;
-
-    if(lock == false && is_open == true) {
-        send_to_loxone(true);
-        lock = true;
-        if(DEBUG) {
-            Serial.print(F("Switched to status open"));
-        }
-
+    
+    if (lock == false && is_open == true) {
+          send_to_loxone(is_open);
+          lock = true;
+          
     } else if (lock == true && is_open == false) {
-        send_to_loxone(false);
-        lock = false;
-        if(DEBUG) {
-            Serial.print(F("Switched to status closed"));
-        }
-
-    }   
-}
+          send_to_loxone(is_open);
+          lock = false;
+    } 
+} 
